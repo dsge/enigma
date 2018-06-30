@@ -11,29 +11,16 @@ import {
   WebGLRenderer,
   Scene,
   PerspectiveCamera,
-  BoxGeometry,
-  MeshBasicMaterial,
-  MeshPhongMaterial,
-  EdgesGeometry,
-  LineBasicMaterial,
-  LineSegments,
-  Material,
   Mesh,
   Clock,
   GridHelper,
   Vector3,
   Euler,
   ArrowHelper,
-  CylinderGeometry,
-  Group,
-  RingGeometry,
-  DoubleSide,
-  Geometry,
-  Face3
 } from 'three';
 import * as Three from 'three';
 import CameraControls from 'camera-controls';
-import { BehaviorSubject } from 'rxjs/BehaviorSubject';
+import {Player} from '../player';
 
 @Component({
   selector: 'app-test',
@@ -42,8 +29,7 @@ import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 })
 export class TestComponent implements OnInit {
 
-  protected player: Group;
-  protected playerCharacter: Mesh;
+  protected player: Player;
   protected playerRenderer: WebGLRenderer;
   protected orbitRenderer: WebGLRenderer;
   protected scene: Scene;
@@ -51,8 +37,6 @@ export class TestComponent implements OnInit {
   protected orbitCamera: PerspectiveCamera;
   protected orbitControls: CameraControls;
   protected clock = new Clock();
-  protected upwardsMomentum: number = null;
-  protected alreadyDoubleJumped: Boolean = false;
 
   constructor(protected element: ElementRef, protected ngZone: NgZone, protected userControlService: UserControlService) { }
 
@@ -74,29 +58,20 @@ export class TestComponent implements OnInit {
   }
 
   protected initPlayer() {
-    const geometry = new CylinderGeometry( 0.6, 0.6, 2, 16);
-    const material = new MeshBasicMaterial({
-      color: 0x343d46,
-    });
-    this.playerCharacter = new Mesh( geometry, material );
-    this.player = new Group();
-    this.player.add(this.playerCharacter);
-    this.addWireframe(this.playerCharacter);
-    // this.addArrow(playerCharacter);
-    this.player.add(this.createIndicatorRing());
+    this.player = new Player();
     return this.player;
   }
 
   protected initUserControlEvents() {
-    const initialMomentum = 0.2;
+    const initialMomentum = this.player.initialJumpMomentum;
     this.userControlService.tryingToJump.subscribe((value) => {
       if (value) {
-        if (this.upwardsMomentum === null) { // jump
-          this.upwardsMomentum = initialMomentum;
+        if (this.player.upwardsMomentum === null) { // jump
+          this.player.upwardsMomentum = initialMomentum;
         } else { // double jump
-          if (!this.alreadyDoubleJumped) {
-            this.alreadyDoubleJumped = true;
-            this.upwardsMomentum = initialMomentum;
+          if (!this.player.alreadyDoubleJumped) {
+            this.player.alreadyDoubleJumped = true;
+            this.player.upwardsMomentum = initialMomentum;
           }
         }
       }
@@ -111,17 +86,6 @@ export class TestComponent implements OnInit {
     this.userControlService.handleKeyboardEvent(event);
   }
 
-  protected addWireframe(mesh: Mesh) {
-    const wireframe = new LineSegments(
-      new EdgesGeometry( mesh.geometry, 1 ),
-      new LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
-    );
-    (mesh.material as Material).polygonOffset = true;
-    (mesh.material as Material).polygonOffsetFactor = 1; // positive value pushes polygon further away
-    (mesh.material as Material).polygonOffsetUnits = 1;
-    return mesh.add(wireframe);
-  }
-
   protected addArrow(mesh: Mesh) {
     const origin = new Vector3( 0, 1.1, 0 );
     const length = 1;
@@ -131,29 +95,7 @@ export class TestComponent implements OnInit {
     mesh.add( arrowHelper );
   }
 
-  protected createIndicatorRing(): Group {
-    const ring = new Mesh(
-      new RingGeometry( 0.9, 1, 32 ),
-      new MeshBasicMaterial( { color: 0xffff00, side: DoubleSide } )
-    );
-    const arrowGeometry = new Geometry();
-    arrowGeometry.vertices = [
-      new Vector3(0, 1.2, 0),
-      new Vector3(0.2, 0.95, 0),
-      new Vector3(-0.2, 0.95, 0)
-    ];
-    arrowGeometry.faces = [new Face3(1, 0, 2)];
-    const arrow = new Mesh(
-      arrowGeometry,
-      new MeshBasicMaterial( { color: 0xffff00, side: DoubleSide } )
-    );
-    const ret = new Group();
-    ret.rotateX(Math.PI / 2);
-    ret.position.y = -0.98;
-    ret.add(ring);
-    ret.add(arrow);
-    return ret;
-  }
+
 
   protected initCanvas(width: number, height: number) {
     const playerCanvas = this.element.nativeElement.querySelector('.player-canvas');
@@ -187,12 +129,9 @@ export class TestComponent implements OnInit {
 
   protected animate() {
     const delta = this.clock.getDelta();
-    const isControlsUpdated = this.orbitControls.update( delta );
+    this.orbitControls.update( delta );
 
     requestAnimationFrame( this.animate.bind(this) );
-
-    // this.player.rotation.x += 0.01;
-    // this.player.rotation.y += 0.01;
 
     this.handlePlayerActions(delta);
 
@@ -241,7 +180,7 @@ export class TestComponent implements OnInit {
     this.handlePlayerMovement(delta);
     this.handlePlayerJumping(delta);
 
-    const turningRate = 5 * 60 * delta;
+    const turningRate = this.player.turningSpeed * delta;
 
     this.player.rotation.y = this.getPlayerRotationY(
       this.player.rotation.y,
@@ -257,7 +196,7 @@ export class TestComponent implements OnInit {
   }
 
   protected handlePlayerMovement(delta) {
-    const userMovementSpeed = 7 * delta;
+    const userMovementSpeed = this.player.movementSpeed * delta;
     let movingInDirections = 0;
     let moveZ = 0;
     let moveX = 0;
@@ -287,14 +226,14 @@ export class TestComponent implements OnInit {
   }
 
   protected handlePlayerJumping(delta) {
-    if (this.upwardsMomentum !== null) {
-      this.upwardsMomentum -= 0.01;
-      this.playerCharacter.position.y += this.upwardsMomentum;
+    if (this.player.upwardsMomentum !== null) {
+      this.player.upwardsMomentum -= this.player.jumpGravity;
+      this.player.playerCharacter.position.y += this.player.upwardsMomentum;
 
-      if (this.playerCharacter.position.y <= 0) {
-        this.playerCharacter.position.y = 0;
-        this.upwardsMomentum = null;
-        this.alreadyDoubleJumped = false;
+      if (this.player.playerCharacter.position.y <= 0) {
+        this.player.playerCharacter.position.y = 0;
+        this.player.upwardsMomentum = null;
+        this.player.alreadyDoubleJumped = false;
         if (this.userControlService.tryingToJump.getValue()) {
           this.userControlService.tryingToJump.next(true); // keep jumping
         }
