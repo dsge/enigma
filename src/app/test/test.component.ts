@@ -36,7 +36,7 @@ import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 })
 export class TestComponent implements OnInit {
 
-  protected cube: Mesh;
+  protected player: Mesh;
   protected playerRenderer: WebGLRenderer;
   protected orbitRenderer: WebGLRenderer;
   protected scene: Scene;
@@ -62,16 +62,16 @@ export class TestComponent implements OnInit {
     const material = new MeshBasicMaterial({
       color: 0x343d46,
     });
-    this.cube = new Mesh( geometry, material );
-    this.addWireframe(this.cube);
-    this.scene.add( this.cube );
+    this.player = new Mesh( geometry, material );
+    this.addWireframe(this.player);
+    this.scene.add( this.player );
 
     const origin = new Vector3( 0, 1.1, 0 );
     const length = 3;
     const hex = 0xffff00;
 
     const arrowHelper = new ArrowHelper( new Vector3(0, 0, 1), origin, length, hex);
-    this.cube.add( arrowHelper );
+    this.player.add( arrowHelper );
 
     const gridHelper = new GridHelper( 50, 50 );
     gridHelper.position.y = - 1;
@@ -105,7 +105,7 @@ export class TestComponent implements OnInit {
 
   protected addWireframe(mesh: Mesh) {
     const wireframe = new LineSegments(
-      new EdgesGeometry( this.cube.geometry, 1 ),
+      new EdgesGeometry( this.player.geometry, 1 ),
       new LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
     );
     (mesh.material as Material).polygonOffset = true;
@@ -150,10 +150,10 @@ export class TestComponent implements OnInit {
 
     requestAnimationFrame( this.animate.bind(this) );
 
-    // this.cube.rotation.x += 0.01;
-    // this.cube.rotation.y += 0.01;
+    // this.player.rotation.x += 0.01;
+    // this.player.rotation.y += 0.01;
 
-    this.handlePlayerMovement(delta);
+    this.handlePlayerActions(delta);
 
     this.orbitRenderer.render( this.scene, this.orbitCamera );
     this.playerRenderer.render( this.scene, this.playerCamera );
@@ -189,16 +189,34 @@ export class TestComponent implements OnInit {
         angle = baseAngle + 90;
       }
     }
-    if (angle !== null){
+    if (angle !== null) {
       ret.y = angle * Math.PI / 180;
     }
 
     return ret;
   }
 
+  protected handlePlayerActions(delta) {
+    this.handlePlayerMovement(delta);
+    this.handlePlayerJumping(delta);
+
+    const turningRate = 5 * 60 * delta;
+
+    this.player.rotation.y = this.getPlayerRotationY(
+      this.player.rotation.y,
+      this.playerShouldBeRotatedTo(this.player.rotation).y,
+      turningRate
+    );
+    this.focusPlayerCameraOnPlayer(this.player.position);
+  }
+
+  protected focusPlayerCameraOnPlayer(position: Vector3) {
+    this.playerCamera.position.z = position.z + 10;
+    this.playerCamera.position.x = position.x;
+  }
+
   protected handlePlayerMovement(delta) {
     const userMovementSpeed = 7 * delta;
-    const shouldBeRotatedTo = this.playerShouldBeRotatedTo(this.cube.rotation);
     let movingInDirections = 0;
     let moveZ = 0;
     let moveX = 0;
@@ -223,15 +241,17 @@ export class TestComponent implements OnInit {
       moveZ /= Math.sqrt(2);
       moveX /= Math.sqrt(2);
     }
-    this.cube.position.z += moveZ;
-    this.cube.position.x += moveX;
+    this.player.position.z += moveZ;
+    this.player.position.x += moveX;
+  }
 
+  protected handlePlayerJumping(delta) {
     if (this.upwardsMomentum !== null) {
       this.upwardsMomentum -= 0.01;
-      this.cube.position.y += this.upwardsMomentum;
+      this.player.position.y += this.upwardsMomentum;
 
-      if (this.cube.position.y <= 0) {
-        this.cube.position.y = 0;
+      if (this.player.position.y <= 0) {
+        this.player.position.y = 0;
         this.upwardsMomentum = null;
         this.alreadyDoubleJumped = false;
         if (this.userControlService.tryingToJump.getValue()) {
@@ -239,24 +259,14 @@ export class TestComponent implements OnInit {
         }
       }
     }
-    const turningRate = 5 * 60 * delta;
+  }
 
-    const lookingNow = new Vector3( 0, 0, 1 );
-    lookingNow.applyQuaternion( this.cube.quaternion );
-
-
-    const shouldLookAtAfterTurning = (new Vector3).addVectors(shouldBeRotatedTo, this.cube.position);
-
-    const lookAt = (new Vector3).addVectors(shouldLookAtAfterTurning, lookingNow);
-
-
-
-    // this.cube.lookAt(shouldLookAtAfterTurning);
-    // if (shouldBeRotatedTo.y - this.cube.rotation.y)
-
-
-    let currentAngle = this.radToDeg(this.cube.rotation.y) % 360;
-    const targetAngle = this.radToDeg(shouldBeRotatedTo.y);
+  protected getPlayerRotationY(currentRotationRad, targetRotationRad, turningRate: number): number {
+    /**
+     * https://stackoverflow.com/a/41113257
+     */
+    let currentAngle = this.radToDeg(currentRotationRad) % 360;
+    const targetAngle = this.radToDeg(targetRotationRad);
     if ( Math.abs(targetAngle - currentAngle) >= turningRate && Math.abs(targetAngle - currentAngle) < 359) {
       let addto = 0;
       if (targetAngle - currentAngle < 0) {
@@ -270,10 +280,7 @@ export class TestComponent implements OnInit {
     } else {
       currentAngle = targetAngle;
     }
-    this.cube.rotation.y = this.degToRad(currentAngle);
-
-    this.playerCamera.position.z = this.cube.position.z + 10;
-    this.playerCamera.position.x = this.cube.position.x;
+    return this.degToRad(currentAngle);
   }
 
   protected radToDeg(rad: number): number {
