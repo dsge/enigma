@@ -24,6 +24,12 @@ import {
   Vector3,
   Euler,
   ArrowHelper,
+  CylinderGeometry,
+  Group,
+  RingGeometry,
+  DoubleSide,
+  Geometry,
+  Face3
 } from 'three';
 import * as Three from 'three';
 import CameraControls from 'camera-controls';
@@ -36,7 +42,8 @@ import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 })
 export class TestComponent implements OnInit {
 
-  protected player: Mesh;
+  protected player: Group;
+  protected playerCharacter: Mesh;
   protected playerRenderer: WebGLRenderer;
   protected orbitRenderer: WebGLRenderer;
   protected scene: Scene;
@@ -58,25 +65,26 @@ export class TestComponent implements OnInit {
   }
 
   protected initScene() {
-    const geometry = new BoxGeometry( 2, 2, 2 );
-    const material = new MeshBasicMaterial({
-      color: 0x343d46,
-    });
-    this.player = new Mesh( geometry, material );
-    this.addWireframe(this.player);
-    this.scene.add( this.player );
-
-    const origin = new Vector3( 0, 1.1, 0 );
-    const length = 3;
-    const hex = 0xffff00;
-
-    const arrowHelper = new ArrowHelper( new Vector3(0, 0, 1), origin, length, hex);
-    this.player.add( arrowHelper );
+    this.scene.add( this.initPlayer() );
 
     const gridHelper = new GridHelper( 50, 50 );
     gridHelper.position.y = - 1;
     this.scene.add( gridHelper );
 
+  }
+
+  protected initPlayer() {
+    const geometry = new CylinderGeometry( 0.6, 0.6, 2, 16);
+    const material = new MeshBasicMaterial({
+      color: 0x343d46,
+    });
+    this.playerCharacter = new Mesh( geometry, material );
+    this.player = new Group();
+    this.player.add(this.playerCharacter);
+    this.addWireframe(this.playerCharacter);
+    // this.addArrow(playerCharacter);
+    this.player.add(this.createIndicatorRing());
+    return this.player;
   }
 
   protected initUserControlEvents() {
@@ -105,13 +113,46 @@ export class TestComponent implements OnInit {
 
   protected addWireframe(mesh: Mesh) {
     const wireframe = new LineSegments(
-      new EdgesGeometry( this.player.geometry, 1 ),
+      new EdgesGeometry( mesh.geometry, 1 ),
       new LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
     );
     (mesh.material as Material).polygonOffset = true;
     (mesh.material as Material).polygonOffsetFactor = 1; // positive value pushes polygon further away
     (mesh.material as Material).polygonOffsetUnits = 1;
     return mesh.add(wireframe);
+  }
+
+  protected addArrow(mesh: Mesh) {
+    const origin = new Vector3( 0, 1.1, 0 );
+    const length = 1;
+    const hex = 0xffff00;
+
+    const arrowHelper = new ArrowHelper( new Vector3(0, 0, 1), origin, length, hex);
+    mesh.add( arrowHelper );
+  }
+
+  protected createIndicatorRing(): Group {
+    const ring = new Mesh(
+      new RingGeometry( 0.9, 1, 32 ),
+      new MeshBasicMaterial( { color: 0xffff00, side: DoubleSide } )
+    );
+    const arrowGeometry = new Geometry();
+    arrowGeometry.vertices = [
+      new Vector3(0, 1.2, 0),
+      new Vector3(0.2, 0.95, 0),
+      new Vector3(-0.2, 0.95, 0)
+    ];
+    arrowGeometry.faces = [new Face3(1, 0, 2)];
+    const arrow = new Mesh(
+      arrowGeometry,
+      new MeshBasicMaterial( { color: 0xffff00, side: DoubleSide } )
+    );
+    const ret = new Group();
+    ret.rotateX(Math.PI / 2);
+    ret.position.y = -0.98;
+    ret.add(ring);
+    ret.add(arrow);
+    return ret;
   }
 
   protected initCanvas(width: number, height: number) {
@@ -248,10 +289,10 @@ export class TestComponent implements OnInit {
   protected handlePlayerJumping(delta) {
     if (this.upwardsMomentum !== null) {
       this.upwardsMomentum -= 0.01;
-      this.player.position.y += this.upwardsMomentum;
+      this.playerCharacter.position.y += this.upwardsMomentum;
 
-      if (this.player.position.y <= 0) {
-        this.player.position.y = 0;
+      if (this.playerCharacter.position.y <= 0) {
+        this.playerCharacter.position.y = 0;
         this.upwardsMomentum = null;
         this.alreadyDoubleJumped = false;
         if (this.userControlService.tryingToJump.getValue()) {
