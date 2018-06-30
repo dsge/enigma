@@ -20,8 +20,10 @@
     "@angular/platform-browser": "^6.0.3",
     "@angular/platform-browser-dynamic": "^6.0.3",
     "@angular/router": "^6.0.3",
+    "camera-controls": "^1.2.2",
     "core-js": "^2.5.4",
-    "rxjs": "^6.0.0",
+    "rxjs": "6",
+    "rxjs-compat": "6",
     "three": "^0.94.0",
     "zone.js": "^0.8.26"
   },
