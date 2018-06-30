@@ -166,7 +166,7 @@ export class TestComponent implements OnInit {
     if (this.userControlService.tryingToGoForward.getValue()) {
       angle = baseAngle + 180;
       if (this.userControlService.tryingToGoLeft.getValue()) {
-        angle = baseAngle + 180 + 45;
+        angle = baseAngle - 180 + 45;
       }
       if (this.userControlService.tryingToGoRight.getValue()) {
         angle = baseAngle + 180 - 45;
@@ -199,18 +199,32 @@ export class TestComponent implements OnInit {
   protected handlePlayerMovement(delta) {
     const userMovementSpeed = 7 * delta;
     const shouldBeRotatedTo = this.playerShouldBeRotatedTo(this.cube.rotation);
+    let movingInDirections = 0;
+    let moveZ = 0;
+    let moveX = 0;
+
     if (this.userControlService.tryingToGoForward.getValue()) {
-      this.cube.position.z -= userMovementSpeed;
+      moveZ -= userMovementSpeed;
+      movingInDirections++;
     }
     if (this.userControlService.tryingToGoBackwards.getValue()) {
-      this.cube.position.z += userMovementSpeed;
+      moveZ += userMovementSpeed;
+      movingInDirections++;
     }
     if (this.userControlService.tryingToGoLeft.getValue()) {
-      this.cube.position.x -= userMovementSpeed;
+      moveX -= userMovementSpeed;
+      movingInDirections++;
     }
     if (this.userControlService.tryingToGoRight.getValue()) {
-      this.cube.position.x += userMovementSpeed;
+      moveX += userMovementSpeed;
+      movingInDirections++;
     }
+    if (movingInDirections > 1) {
+      moveZ /= Math.sqrt(2);
+      moveX /= Math.sqrt(2);
+    }
+    this.cube.position.z += moveZ;
+    this.cube.position.x += moveX;
 
     if (this.upwardsMomentum !== null) {
       this.upwardsMomentum -= 0.01;
@@ -225,7 +239,7 @@ export class TestComponent implements OnInit {
         }
       }
     }
-    const turningRate = 200 * delta;
+    const turningRate = 5 * 60 * delta;
 
     const lookingNow = new Vector3( 0, 0, 1 );
     lookingNow.applyQuaternion( this.cube.quaternion );
@@ -243,7 +257,7 @@ export class TestComponent implements OnInit {
 
     let currentAngle = this.radToDeg(this.cube.rotation.y) % 360;
     const targetAngle = this.radToDeg(shouldBeRotatedTo.y);
-    if ( Math.abs(targetAngle - currentAngle) >= turningRate) {
+    if ( Math.abs(targetAngle - currentAngle) >= turningRate && Math.abs(targetAngle - currentAngle) < 359) {
       let addto = 0;
       if (targetAngle - currentAngle < 0) {
         addto = 360;
