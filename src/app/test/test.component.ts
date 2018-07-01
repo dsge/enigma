@@ -21,6 +21,7 @@ import {
 import * as Three from 'three';
 import CameraControls from 'camera-controls';
 import {Player} from '../player';
+import {GameLoopService} from '../game-loop.service';
 
 @Component({
   selector: 'app-test',
@@ -38,7 +39,12 @@ export class TestComponent implements OnInit {
   protected orbitControls: CameraControls;
   protected clock = new Clock();
 
-  constructor(protected element: ElementRef, protected ngZone: NgZone, protected userControlService: UserControlService) { }
+  constructor(
+    protected element: ElementRef,
+    protected ngZone: NgZone,
+    protected userControlService: UserControlService,
+    protected gameLoopService: GameLoopService
+  ) { }
 
   ngOnInit() {
     CameraControls.install( { THREE: Three } );
@@ -58,7 +64,7 @@ export class TestComponent implements OnInit {
   }
 
   protected initPlayer() {
-    this.player = new Player();
+    this.player = new Player(this.gameLoopService, this.userControlService);
     return this.player;
   }
 
@@ -133,134 +139,17 @@ export class TestComponent implements OnInit {
 
     requestAnimationFrame( this.animate.bind(this) );
 
-    this.handlePlayerActions(delta);
+    this.gameLoopService.loop.emit(delta);
+
+    this.focusPlayerCameraOnPlayer(this.player.position);
 
     this.orbitRenderer.render( this.scene, this.orbitCamera );
     this.playerRenderer.render( this.scene, this.playerCamera );
   }
 
-  protected playerShouldBeRotatedTo(currentRotation: Euler): Vector3 {
-    const ret = new Vector3(0, currentRotation.y, 0);
-    let angle = null;
-    const baseAngle = 0;
-    if (this.userControlService.tryingToGoForward.getValue()) {
-      angle = baseAngle + 180;
-      if (this.userControlService.tryingToGoLeft.getValue()) {
-        angle = baseAngle - 180 + 45;
-      }
-      if (this.userControlService.tryingToGoRight.getValue()) {
-        angle = baseAngle + 180 - 45;
-      }
-    }
-    if (this.userControlService.tryingToGoBackwards.getValue()) {
-      angle = baseAngle + 0;
-      if (this.userControlService.tryingToGoLeft.getValue()) {
-        angle = baseAngle + 0 - 45;
-      }
-      if (this.userControlService.tryingToGoRight.getValue()) {
-        angle = baseAngle + 0 + 45;
-      }
-    }
-    if (!this.userControlService.tryingToGoForward.getValue() && !this.userControlService.tryingToGoBackwards.getValue()) {
-      if (this.userControlService.tryingToGoLeft.getValue()) {
-        angle = baseAngle - 90;
-      }
-      if (this.userControlService.tryingToGoRight.getValue()) {
-        angle = baseAngle + 90;
-      }
-    }
-    if (angle !== null) {
-      ret.y = angle * Math.PI / 180;
-    }
-
-    return ret;
-  }
-
-  protected handlePlayerActions(delta) {
-    this.handlePlayerMovement(delta);
-    this.handlePlayerJumping(delta);
-
-    const turningRate = this.player.turningSpeed * delta;
-
-    this.player.rotation.y = this.getPlayerRotationY(
-      this.player.rotation.y,
-      this.playerShouldBeRotatedTo(this.player.rotation).y,
-      turningRate
-    );
-    this.focusPlayerCameraOnPlayer(this.player.position);
-  }
-
   protected focusPlayerCameraOnPlayer(position: Vector3) {
     this.playerCamera.position.z = position.z + 10;
     this.playerCamera.position.x = position.x;
-  }
-
-  protected handlePlayerMovement(delta) {
-    const userMovementSpeed = this.player.movementSpeed * delta;
-    let movingInDirections = 0;
-    let moveZ = 0;
-    let moveX = 0;
-
-    if (this.userControlService.tryingToGoForward.getValue()) {
-      moveZ -= userMovementSpeed;
-      movingInDirections++;
-    }
-    if (this.userControlService.tryingToGoBackwards.getValue()) {
-      moveZ += userMovementSpeed;
-      movingInDirections++;
-    }
-    if (this.userControlService.tryingToGoLeft.getValue()) {
-      moveX -= userMovementSpeed;
-      movingInDirections++;
-    }
-    if (this.userControlService.tryingToGoRight.getValue()) {
-      moveX += userMovementSpeed;
-      movingInDirections++;
-    }
-    if (movingInDirections > 1) {
-      moveZ /= Math.sqrt(2);
-      moveX /= Math.sqrt(2);
-    }
-    this.player.position.z += moveZ;
-    this.player.position.x += moveX;
-  }
-
-  protected handlePlayerJumping(delta) {
-    if (this.player.upwardsMomentum !== null) {
-      this.player.upwardsMomentum -= this.player.jumpGravity;
-      this.player.playerCharacter.position.y += this.player.upwardsMomentum;
-
-      if (this.player.playerCharacter.position.y <= 0) {
-        this.player.playerCharacter.position.y = 0;
-        this.player.upwardsMomentum = null;
-        this.player.alreadyDoubleJumped = false;
-        if (this.userControlService.tryingToJump.getValue()) {
-          this.userControlService.tryingToJump.next(true); // keep jumping
-        }
-      }
-    }
-  }
-
-  protected getPlayerRotationY(currentRotationRad, targetRotationRad, turningRate: number): number {
-    /**
-     * https://stackoverflow.com/a/41113257
-     */
-    let currentAngle = this.radToDeg(currentRotationRad) % 360;
-    const targetAngle = this.radToDeg(targetRotationRad);
-    if ( Math.abs(targetAngle - currentAngle) >= turningRate && Math.abs(targetAngle - currentAngle) < 359) {
-      let addto = 0;
-      if (targetAngle - currentAngle < 0) {
-        addto = 360;
-      }
-      if ( targetAngle - currentAngle + addto <= 180 ) {
-        currentAngle += turningRate;
-      } else {
-         currentAngle -= turningRate;
-      }
-    } else {
-      currentAngle = targetAngle;
-    }
-    return this.degToRad(currentAngle);
   }
 
   protected radToDeg(rad: number): number {

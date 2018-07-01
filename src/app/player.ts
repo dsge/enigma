@@ -11,8 +11,11 @@ import {
   Geometry,
   DoubleSide,
   Vector3,
-  Face3
+  Face3,
+  Euler
 } from 'three';
+import {GameLoopService} from './game-loop.service';
+import { UserControlService } from './user-control.service';
 
 export class Player extends Group {
   public playerCharacter: Mesh;
@@ -38,7 +41,7 @@ export class Player extends Group {
   public upwardsMomentum: number = null;
   public alreadyDoubleJumped: Boolean = false;
 
-  constructor() {
+  constructor(protected gameLoopService: GameLoopService, protected userControlService: UserControlService) {
     super();
 
     this.playerCharacter = this.createPlayerCharacter();
@@ -46,6 +49,128 @@ export class Player extends Group {
 
     this.add(this.playerCharacter);
     this.add(this.createIndicatorRing());
+
+    this.gameLoopService.loop.subscribe(this.loop.bind(this));
+  }
+
+  protected loop(delta) {
+    this.handlePlayerMovement(delta);
+    this.handlePlayerJumping(delta);
+
+    const turningRate = this.turningSpeed * delta;
+
+    this.rotation.y = this.getPlayerRotationY(
+      this.rotation.y,
+      this.playerShouldBeRotatedTo(this.rotation).y,
+      turningRate
+    );
+  }
+
+
+  protected playerShouldBeRotatedTo(currentRotation: Euler): Vector3 {
+    const ret = new Vector3(0, currentRotation.y, 0);
+    let angle = null;
+    const baseAngle = 0;
+    if (this.userControlService.tryingToGoForward.getValue()) {
+      angle = baseAngle + 180;
+      if (this.userControlService.tryingToGoLeft.getValue()) {
+        angle = baseAngle - 180 + 45;
+      }
+      if (this.userControlService.tryingToGoRight.getValue()) {
+        angle = baseAngle + 180 - 45;
+      }
+    }
+    if (this.userControlService.tryingToGoBackwards.getValue()) {
+      angle = baseAngle + 0;
+      if (this.userControlService.tryingToGoLeft.getValue()) {
+        angle = baseAngle + 0 - 45;
+      }
+      if (this.userControlService.tryingToGoRight.getValue()) {
+        angle = baseAngle + 0 + 45;
+      }
+    }
+    if (!this.userControlService.tryingToGoForward.getValue() && !this.userControlService.tryingToGoBackwards.getValue()) {
+      if (this.userControlService.tryingToGoLeft.getValue()) {
+        angle = baseAngle - 90;
+      }
+      if (this.userControlService.tryingToGoRight.getValue()) {
+        angle = baseAngle + 90;
+      }
+    }
+    if (angle !== null) {
+      ret.y = angle * Math.PI / 180;
+    }
+
+    return ret;
+  }
+
+
+  protected handlePlayerMovement(delta) {
+    const userMovementSpeed = this.movementSpeed * delta;
+    let movingInDirections = 0;
+    let moveZ = 0;
+    let moveX = 0;
+
+    if (this.userControlService.tryingToGoForward.getValue()) {
+      moveZ -= userMovementSpeed;
+      movingInDirections++;
+    }
+    if (this.userControlService.tryingToGoBackwards.getValue()) {
+      moveZ += userMovementSpeed;
+      movingInDirections++;
+    }
+    if (this.userControlService.tryingToGoLeft.getValue()) {
+      moveX -= userMovementSpeed;
+      movingInDirections++;
+    }
+    if (this.userControlService.tryingToGoRight.getValue()) {
+      moveX += userMovementSpeed;
+      movingInDirections++;
+    }
+    if (movingInDirections > 1) {
+      moveZ /= Math.sqrt(2);
+      moveX /= Math.sqrt(2);
+    }
+    this.position.z += moveZ;
+    this.position.x += moveX;
+  }
+
+  protected handlePlayerJumping(delta) {
+    if (this.upwardsMomentum !== null) {
+      this.upwardsMomentum -= this.jumpGravity;
+      this.playerCharacter.position.y += this.upwardsMomentum;
+
+      if (this.playerCharacter.position.y <= 0) {
+        this.playerCharacter.position.y = 0;
+        this.upwardsMomentum = null;
+        this.alreadyDoubleJumped = false;
+        if (this.userControlService.tryingToJump.getValue()) {
+          this.userControlService.tryingToJump.next(true); // keep jumping
+        }
+      }
+    }
+  }
+
+  protected getPlayerRotationY(currentRotationRad, targetRotationRad, turningRate: number): number {
+    /**
+     * https://stackoverflow.com/a/41113257
+     */
+    let currentAngle = this.radToDeg(currentRotationRad) % 360;
+    const targetAngle = this.radToDeg(targetRotationRad);
+    if ( Math.abs(targetAngle - currentAngle) >= turningRate && Math.abs(targetAngle - currentAngle) < 359) {
+      let addto = 0;
+      if (targetAngle - currentAngle < 0) {
+        addto = 360;
+      }
+      if ( targetAngle - currentAngle + addto <= 180 ) {
+        currentAngle += turningRate;
+      } else {
+         currentAngle -= turningRate;
+      }
+    } else {
+      currentAngle = targetAngle;
+    }
+    return this.degToRad(currentAngle);
   }
 
   protected createPlayerCharacter(): Mesh {
@@ -89,5 +214,13 @@ export class Player extends Group {
     ret.add(ring);
     ret.add(arrow);
     return ret;
+  }
+
+  protected radToDeg(rad: number): number {
+    return rad * 180 / Math.PI;
+  }
+
+  protected degToRad(deg: number): number {
+    return deg * Math.PI / 180;
   }
 }
