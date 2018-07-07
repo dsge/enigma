@@ -8,7 +8,7 @@ git remote add pages "https://$GITHUB_TOKEN@github.com/$TRAVIS_REPO_SLUG.git"
 git fetch pages
 git checkout gh-pages
 
-cp -r $TRAVIS_BUILD_DIR/dist/enigma. ~/deploy
+cp -r $TRAVIS_BUILD_DIR/dist/enigma ~/deploy
 
 #remove all gitignore files to make sure we can commit all files from the public folder to github pages
 find . -name ".gitignore" -type f -delete
