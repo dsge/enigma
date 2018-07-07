@@ -22,6 +22,7 @@ import * as Three from 'three';
 import CameraControls from 'camera-controls';
 import {Player} from '../player';
 import {GameLoopService} from '../game-loop.service';
+import {Map} from '../map';
 
 @Component({
   selector: 'app-test',
@@ -38,6 +39,7 @@ export class TestComponent implements OnInit {
   protected orbitCamera: PerspectiveCamera;
   protected orbitControls: CameraControls;
   protected clock = new Clock();
+  protected map: Map;
 
   constructor(
     protected element: ElementRef,
@@ -56,6 +58,12 @@ export class TestComponent implements OnInit {
 
   protected initScene() {
     this.scene.add( this.initPlayer() );
+
+    this.map = new Map(50, 50);
+    this.map.rotation.x = Math.PI / 2;
+    this.map.rotation.y = Math.PI;
+    this.map.position.y = -1.02;
+    this.scene.add(this.map);
 
     const gridHelper = new GridHelper( 50, 50 );
     gridHelper.position.y = - 1;
