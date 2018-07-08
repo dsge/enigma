@@ -8,6 +8,12 @@ import {
   Vector3,
   Vector2,
   Raycaster,
+  Object3D,
+  BoxBufferGeometry,
+  LineSegments,
+  EdgesGeometry,
+  LineBasicMaterial,
+  Material,
 } from 'three';
 
 export class Map extends Group {
@@ -15,13 +21,38 @@ export class Map extends Group {
   public spawnPosition: Vector3;
   protected raycaster = new Raycaster;
   protected raycasterDownVector = new Vector3(0, -1, 0);
-  protected collisionResults = new Array();
+  protected floorCollisionResults = new Array();
+  protected collisionObjects = new Array<Object3D>();
 
   constructor(size: number = 50, segments = 50) {
     super();
 
     this.floor = this.createFloor(size, segments);
+    const cube = this.createCube();
+    cube.position.x = -5;
+    cube.position.y = -5;
+    cube.position.z = 0;
+    this.addWireframe(cube);
+    this.collisionObjects.push(cube);
+    this.add(cube);
     this.add(this.floor);
+  }
+
+  protected createCube(): Mesh {
+    const geometry = new BoxBufferGeometry( 4, 4, 4, 2, 2, 2 );
+    const material = new MeshBasicMaterial( { color: 0xcccccc } );
+    return new Mesh( geometry, material );
+  }
+
+  protected addWireframe(mesh: Mesh) {
+    const wireframe = new LineSegments(
+      new EdgesGeometry( mesh.geometry, 1 ),
+      new LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+    );
+    (mesh.material as Material).polygonOffset = true;
+    (mesh.material as Material).polygonOffsetFactor = 1; // positive value pushes polygon further away
+    (mesh.material as Material).polygonOffsetUnits = 1;
+    return mesh.add(wireframe);
   }
 
   protected createFloor(size, segments): Mesh {
@@ -41,14 +72,18 @@ export class Map extends Group {
     return new Mesh(geometry, new MeshFaceMaterial(materials));
   }
 
+  getCollisionObjects(): Array<Object3D> {
+    return this.collisionObjects;
+  }
+
   getFloorLevelAt(position: Vector3): number {
     position = position.clone();
     position.y = 15;
     this.raycaster.set(position, this.raycasterDownVector);
-    this.collisionResults.length = 0;
-    this.raycaster.intersectObject(this.floor, false, this.collisionResults);
-    if (this.collisionResults.length > 0 && this.collisionResults[0].distance > 0) {
-      const pointHeight = this.collisionResults[0].point.y;
+    this.floorCollisionResults.length = 0;
+    this.raycaster.intersectObject(this.floor, false, this.floorCollisionResults);
+    if (this.floorCollisionResults.length > 0 && this.floorCollisionResults[0].distance > 0) {
+      const pointHeight = this.floorCollisionResults[0].point.y;
       return pointHeight - this.position.y;
     }
     return 0;
