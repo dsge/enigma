@@ -132,6 +132,8 @@ export class TestComponent implements OnInit {
       this.element.nativeElement.appendChild(this.orbitRenderer.domElement);
     }
 
+    this.playerRenderer.domElement.focus();
+
     this.scene = new Scene();
     this.orbitCamera = new PerspectiveCamera( 75, width / height, 0.1, 1000 );
     this.orbitCamera.position.z = 35;
