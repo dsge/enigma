@@ -12,10 +12,12 @@ import {
   DoubleSide,
   Vector3,
   Face3,
-  Euler
+  Euler,
+  Vector2
 } from 'three';
 import {GameLoopService} from './game-loop.service';
 import { UserControlService } from './user-control.service';
+import { MapService } from './map.service';
 
 export class Player extends Group {
   public playerCharacter: Mesh;
@@ -41,7 +43,11 @@ export class Player extends Group {
   public upwardsMomentum: number = null;
   public alreadyDoubleJumped: Boolean = false;
 
-  constructor(protected gameLoopService: GameLoopService, protected userControlService: UserControlService) {
+  constructor(
+    protected gameLoopService: GameLoopService,
+    protected userControlService: UserControlService,
+    protected mapService: MapService
+  ) {
     super();
 
     this.playerCharacter = this.createPlayerCharacter();
@@ -133,6 +139,8 @@ export class Player extends Group {
     }
     this.position.z += moveZ;
     this.position.x += moveX;
+
+    this.position.y = this.mapService.currentMap.getFloorLevelAt(this.position);
   }
 
   protected handlePlayerJumping(delta) {

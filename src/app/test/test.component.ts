@@ -23,6 +23,7 @@ import CameraControls from 'camera-controls';
 import {Player} from '../player';
 import {GameLoopService} from '../game-loop.service';
 import {Map} from '../map';
+import { MapService } from '../map.service';
 
 @Component({
   selector: 'app-test',
@@ -45,7 +46,8 @@ export class TestComponent implements OnInit {
     protected element: ElementRef,
     protected ngZone: NgZone,
     protected userControlService: UserControlService,
-    protected gameLoopService: GameLoopService
+    protected gameLoopService: GameLoopService,
+    protected mapService: MapService
   ) { }
 
   ngOnInit() {
@@ -63,6 +65,7 @@ export class TestComponent implements OnInit {
     this.map.rotation.x = Math.PI / 2;
     this.map.rotation.y = Math.PI;
     this.map.position.y = -1.02;
+    this.mapService.currentMap = this.map;
     this.scene.add(this.map);
 
     const gridHelper = new GridHelper( 50, 50 );
@@ -72,7 +75,7 @@ export class TestComponent implements OnInit {
   }
 
   protected initPlayer() {
-    this.player = new Player(this.gameLoopService, this.userControlService);
+    this.player = new Player(this.gameLoopService, this.userControlService, this.mapService);
     return this.player;
   }
 
